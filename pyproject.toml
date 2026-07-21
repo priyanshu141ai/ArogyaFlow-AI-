@@ -1,0 +1,44 @@
+[build-system]
+requires = ["hatchling==1.28.0"]
+build-backend = "hatchling.build"
+
+[project]
+name = "arogyaflow"
+version = "0.1.0"
+description = "ArogyaFlow AI"
+requires-python = ">=3.11"
+dependencies = [
+  "fastapi==0.139.2",
+  "pydantic-settings==2.14.2",
+  "streamlit==1.59.2",
+  "uvicorn==0.51.0",
+]
+
+[dependency-groups]
+dev = [
+  "httpx2==2.7.0",
+  "mypy==2.3.0",
+  "pre-commit==4.6.0",
+  "pytest==9.1.1",
+  "ruff==0.15.22",
+]
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/arogyaflow"]
+
+[tool.pytest.ini_options]
+addopts = "-q"
+pythonpath = ["src"]
+testpaths = ["tests"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+
+[tool.ruff.lint]
+select = ["B", "E", "F", "I", "SIM", "UP"]
+
+[tool.mypy]
+python_version = "3.11"
+strict = true
+files = ["src", "tests"]
