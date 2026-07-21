@@ -24,6 +24,7 @@ dependencies = [
 baseline-analysis = "arogyaflow.baseline_pipeline:main"
 generate-data = "arogyaflow.data.cli:main"
 train-wait-time = "arogyaflow.train_wait_time:main"
+train-arrivals = "arogyaflow.arrival_forecasting:main"
 
 [dependency-groups]
 dev = [

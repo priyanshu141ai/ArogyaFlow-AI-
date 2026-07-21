@@ -30,6 +30,10 @@ class ModelArtifactError(ArogyaFlowError):
     """Raised when a persisted model artifact is invalid."""
 
 
+class ForecastHorizonError(ArogyaFlowError):
+    """Raised when a forecast horizon is unsupported."""
+
+
 class ValidationError(ArogyaFlowError):
     """Raised when domain input is invalid."""
 
