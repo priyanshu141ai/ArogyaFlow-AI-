@@ -18,6 +18,18 @@ class FeatureLeakageError(ArogyaFlowError):
     """Raised when evaluation uses information unavailable at prediction time."""
 
 
+class FeatureSchemaMismatchError(ArogyaFlowError):
+    """Raised when inference features do not match the trained schema."""
+
+
+class TrainingDataError(ArogyaFlowError):
+    """Raised when data cannot safely produce an accepted model."""
+
+
+class ModelArtifactError(ArogyaFlowError):
+    """Raised when a persisted model artifact is invalid."""
+
+
 class ValidationError(ArogyaFlowError):
     """Raised when domain input is invalid."""
 

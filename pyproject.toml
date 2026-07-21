@@ -9,10 +9,13 @@ description = "ArogyaFlow AI"
 requires-python = ">=3.11"
 dependencies = [
   "fastapi==0.139.2",
+  "joblib==1.5.3",
+  "numpy==2.3.4",
   "pandas==2.3.3",
   "pandera==0.32.1",
   "pydantic-settings==2.14.2",
   "pyarrow==24.0.0",
+  "scikit-learn==1.9.0",
   "streamlit==1.59.2",
   "uvicorn==0.51.0",
 ]
@@ -20,6 +23,7 @@ dependencies = [
 [project.scripts]
 baseline-analysis = "arogyaflow.baseline_pipeline:main"
 generate-data = "arogyaflow.data.cli:main"
+train-wait-time = "arogyaflow.train_wait_time:main"
 
 [dependency-groups]
 dev = [
@@ -29,6 +33,10 @@ dev = [
   "pre-commit==4.6.0",
   "pytest==9.1.1",
   "ruff==0.15.22",
+]
+ml = [
+  "mlflow==3.14.0",
+  "shap==0.51.0",
 ]
 
 [tool.hatch.build.targets.wheel]

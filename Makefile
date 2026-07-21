@@ -1,4 +1,4 @@
-.PHONY: install format lint type-check test api dashboard generate-data baseline-analysis
+.PHONY: install format lint type-check test api dashboard generate-data baseline-analysis train-wait-time
 
 install:
 	uv sync --all-groups
@@ -26,3 +26,6 @@ generate-data:
 
 baseline-analysis:
 	uv run baseline-analysis --bronze $(BRONZE)
+
+train-wait-time:
+	uv run --group ml train-wait-time --bronze $(BRONZE) --model-version $(VERSION) --seed $(SEED)
