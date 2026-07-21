@@ -12,6 +12,10 @@ class Settings(BaseSettings):
     environment: Literal["development", "test", "production"] = "development"
     log_level: Literal["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"] = "INFO"
     database_url: PostgresDsn | None = None
+    wait_model_version: str | None = None
+    arrival_model_version: str | None = None
+    no_show_model_version: str | None = None
+    occupancy_model_version: str | None = None
 
 
 @lru_cache

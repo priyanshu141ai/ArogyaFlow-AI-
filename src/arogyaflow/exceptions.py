@@ -34,6 +34,14 @@ class ForecastHorizonError(ArogyaFlowError):
     """Raised when a forecast horizon is unsupported."""
 
 
+class SimulationConfigurationError(ArogyaFlowError):
+    """Raised when a simulation configuration is not operationally valid."""
+
+
+class RecommendationConstraintError(ArogyaFlowError):
+    """Raised when a recommendation violates an explicit constraint."""
+
+
 class ValidationError(ArogyaFlowError):
     """Raised when domain input is invalid."""
 

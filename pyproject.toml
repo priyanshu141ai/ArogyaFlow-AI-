@@ -16,6 +16,7 @@ dependencies = [
   "pydantic-settings==2.14.2",
   "pyarrow==24.0.0",
   "scikit-learn==1.9.0",
+  "simpy==4.1.2",
   "streamlit==1.59.2",
   "uvicorn==0.51.0",
 ]
@@ -27,6 +28,7 @@ train-wait-time = "arogyaflow.train_wait_time:main"
 train-arrivals = "arogyaflow.arrival_forecasting:main"
 train-no-show = "arogyaflow.train_no_show:main"
 train-occupancy = "arogyaflow.bed_occupancy:main"
+simulate-flow = "arogyaflow.simulation:main"
 
 [dependency-groups]
 dev = [
