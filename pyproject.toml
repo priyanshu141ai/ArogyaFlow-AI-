@@ -9,15 +9,22 @@ description = "ArogyaFlow AI"
 requires-python = ">=3.11"
 dependencies = [
   "fastapi==0.139.2",
+  "pandas==2.3.3",
+  "pandera==0.32.1",
   "pydantic-settings==2.14.2",
+  "pyarrow==24.0.0",
   "streamlit==1.59.2",
   "uvicorn==0.51.0",
 ]
+
+[project.scripts]
+generate-data = "arogyaflow.data.cli:main"
 
 [dependency-groups]
 dev = [
   "httpx2==2.7.0",
   "mypy==2.3.0",
+  "pandas-stubs==2.3.3.260113",
   "pre-commit==4.6.0",
   "pytest==9.1.1",
   "ruff==0.15.22",

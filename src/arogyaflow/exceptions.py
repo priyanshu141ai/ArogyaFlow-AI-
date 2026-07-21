@@ -6,6 +6,14 @@ class ConfigurationError(ArogyaFlowError):
     """Raised when application configuration is unusable."""
 
 
+class DataContractError(ArogyaFlowError):
+    """Raised when a dataset does not match its declared schema."""
+
+
+class DataQualityError(ArogyaFlowError):
+    """Raised when data cannot be safely validated or quarantined."""
+
+
 class ValidationError(ArogyaFlowError):
     """Raised when domain input is invalid."""
 

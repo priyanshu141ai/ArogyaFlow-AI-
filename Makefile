@@ -1,4 +1,4 @@
-.PHONY: install format lint type-check test api dashboard
+.PHONY: install format lint type-check test api dashboard generate-data
 
 install:
 	uv sync --all-groups
@@ -21,3 +21,5 @@ api:
 dashboard:
 	uv run streamlit run src/arogyaflow/dashboard.py
 
+generate-data:
+	uv run generate-data --scenario $(SCENARIO) --seed $(SEED) --start $(START)
