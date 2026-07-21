@@ -45,7 +45,13 @@ def run_generation(config: ScenarioConfig, output_root: Path) -> DatasetManifest
 
     dataset = generate_dataset(config)
     result = validate_dataset(dataset)
-    for directory in (raw_dir, bronze_dir, quarantine_dir, manifest_path.parent, quality_path.parent):
+    for directory in (
+        raw_dir,
+        bronze_dir,
+        quarantine_dir,
+        manifest_path.parent,
+        quality_path.parent,
+    ):
         directory.mkdir(parents=True, exist_ok=False)
     for table, frame in dataset.items():
         frame.to_csv(raw_dir / f"{table}.csv", index=False)

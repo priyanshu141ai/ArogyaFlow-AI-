@@ -18,6 +18,7 @@ dependencies = [
 ]
 
 [project.scripts]
+baseline-analysis = "arogyaflow.baseline_pipeline:main"
 generate-data = "arogyaflow.data.cli:main"
 
 [dependency-groups]

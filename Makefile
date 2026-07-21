@@ -1,4 +1,4 @@
-.PHONY: install format lint type-check test api dashboard generate-data
+.PHONY: install format lint type-check test api dashboard generate-data baseline-analysis
 
 install:
 	uv sync --all-groups
@@ -23,3 +23,6 @@ dashboard:
 
 generate-data:
 	uv run generate-data --scenario $(SCENARIO) --seed $(SEED) --start $(START)
+
+baseline-analysis:
+	uv run baseline-analysis --bronze $(BRONZE)

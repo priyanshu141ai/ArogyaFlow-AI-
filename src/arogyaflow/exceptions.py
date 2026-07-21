@@ -14,6 +14,10 @@ class DataQualityError(ArogyaFlowError):
     """Raised when data cannot be safely validated or quarantined."""
 
 
+class FeatureLeakageError(ArogyaFlowError):
+    """Raised when evaluation uses information unavailable at prediction time."""
+
+
 class ValidationError(ArogyaFlowError):
     """Raised when domain input is invalid."""
 
