@@ -1,4 +1,4 @@
-.PHONY: install format lint type-check test api dashboard generate-data baseline-analysis train-wait-time train-arrivals train-no-show
+.PHONY: install format lint type-check test api dashboard generate-data baseline-analysis train-wait-time train-arrivals train-no-show train-occupancy
 
 install:
 	uv sync --all-groups
@@ -35,3 +35,6 @@ train-arrivals:
 
 train-no-show:
 	uv run --group ml train-no-show --bronze $(BRONZE) --model-version $(VERSION) --seed $(SEED) --capacity-fraction $(CAPACITY) --reminder-effectiveness $(EFFECT)
+
+train-occupancy:
+	uv run --group ml train-occupancy --bronze $(BRONZE) --model-version $(VERSION) --seed $(SEED) --alert-threshold $(THRESHOLD)

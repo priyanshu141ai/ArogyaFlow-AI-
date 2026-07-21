@@ -117,6 +117,7 @@ def generate_dataset(config: ScenarioConfig) -> Dataset:
         {"bed_id": _stable_id("bed", config.seed, number), "ward_id": "ward_general"}
         for number in range(bed_count)
     )
+    bed_available_at = {str(bed["bed_id"]): start for bed in beds}
 
     patient_ordinal = encounter_ordinal = admission_ordinal = 0
     for day in range(config.days):
@@ -207,9 +208,11 @@ def generate_dataset(config: ScenarioConfig) -> Dataset:
                     )
                     if rng.random() < 0.05:
                         admission_id = _stable_id("admission", config.seed, admission_ordinal)
-                        admitted = checkout + timedelta(minutes=rng.uniform(10, 40))
+                        requested_admission = checkout + timedelta(minutes=rng.uniform(10, 40))
+                        bed_id = min(bed_available_at, key=bed_available_at.__getitem__)
+                        admitted = max(requested_admission, bed_available_at[bed_id])
                         discharged = admitted + timedelta(hours=rng.uniform(12, 96))
-                        bed_id = beds[admission_ordinal % bed_count]["bed_id"]
+                        bed_available_at[bed_id] = discharged
                         recorded_admission, ingested_admission = _record_times(
                             admitted, rng, latency
                         )

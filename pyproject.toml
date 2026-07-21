@@ -26,6 +26,7 @@ generate-data = "arogyaflow.data.cli:main"
 train-wait-time = "arogyaflow.train_wait_time:main"
 train-arrivals = "arogyaflow.arrival_forecasting:main"
 train-no-show = "arogyaflow.train_no_show:main"
+train-occupancy = "arogyaflow.bed_occupancy:main"
 
 [dependency-groups]
 dev = [
