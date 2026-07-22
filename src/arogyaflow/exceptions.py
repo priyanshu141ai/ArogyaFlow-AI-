@@ -42,6 +42,14 @@ class RecommendationConstraintError(ArogyaFlowError):
     """Raised when a recommendation violates an explicit constraint."""
 
 
+class PersistenceError(ArogyaFlowError):
+    """Raised when an operational record cannot be safely persisted."""
+
+
+class DashboardApiError(ArogyaFlowError):
+    """Raised when the dashboard cannot obtain a valid API response."""
+
+
 class ValidationError(ArogyaFlowError):
     """Raised when domain input is invalid."""
 

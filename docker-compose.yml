@@ -4,11 +4,17 @@ services:
     environment:
       AROGYAFLOW_ENVIRONMENT: production
       AROGYAFLOW_DATABASE_URL: postgresql://${POSTGRES_USER:?set POSTGRES_USER}:${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB:?set POSTGRES_DB}
+      AROGYAFLOW_WAIT_MODEL_PATH: ${AROGYAFLOW_WAIT_MODEL_PATH:-models/wait_time/wait_time.joblib}
+      AROGYAFLOW_ARRIVAL_MODEL_PATH: ${AROGYAFLOW_ARRIVAL_MODEL_PATH:-models/arrivals/arrival_forecast.joblib}
+      AROGYAFLOW_NO_SHOW_MODEL_PATH: ${AROGYAFLOW_NO_SHOW_MODEL_PATH:-models/no_show/no_show.joblib}
+      AROGYAFLOW_OCCUPANCY_MODEL_PATH: ${AROGYAFLOW_OCCUPANCY_MODEL_PATH:-models/occupancy/bed_occupancy.joblib}
     ports:
       - "8000:8000"
     depends_on:
       db:
         condition: service_healthy
+    volumes:
+      - ./models:/app/models:ro
 
   db:
     image: postgres:17-alpine
@@ -27,6 +33,8 @@ services:
   dashboard:
     build: .
     command: streamlit run src/arogyaflow/dashboard.py --server.address 0.0.0.0
+    environment:
+      AROGYAFLOW_API_BASE_URL: http://api:8000
     ports:
       - "8501:8501"
     depends_on:

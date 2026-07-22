@@ -20,3 +20,9 @@ def test_settings_reject_invalid_environment(
     monkeypatch.setenv("AROGYAFLOW_ENVIRONMENT", "invalid")
     with pytest.raises(ValidationError):
         Settings()
+
+
+def test_settings_reject_invalid_pool_size(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    monkeypatch.chdir(tmp_path)
+    with pytest.raises(ValidationError):
+        Settings(database_pool_min_size=3, database_pool_max_size=2)

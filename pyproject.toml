@@ -9,11 +9,14 @@ description = "ArogyaFlow AI"
 requires-python = ">=3.11"
 dependencies = [
   "fastapi==0.139.2",
+  "httpx2==2.7.0",
   "joblib==1.5.3",
   "numpy==2.3.4",
   "pandas==2.3.3",
   "pandera==0.32.1",
   "pydantic-settings==2.14.2",
+  "psycopg[binary]==3.3.4",
+  "psycopg-pool==3.3.1",
   "pyarrow==24.0.0",
   "scikit-learn==1.9.0",
   "simpy==4.1.2",
@@ -29,10 +32,10 @@ train-arrivals = "arogyaflow.arrival_forecasting:main"
 train-no-show = "arogyaflow.train_no_show:main"
 train-occupancy = "arogyaflow.bed_occupancy:main"
 simulate-flow = "arogyaflow.simulation:main"
+migrate-db = "arogyaflow.database:main"
 
 [dependency-groups]
 dev = [
-  "httpx2==2.7.0",
   "mypy==2.3.0",
   "pandas-stubs==2.3.3.260113",
   "pre-commit==4.6.0",
