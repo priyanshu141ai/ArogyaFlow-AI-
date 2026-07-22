@@ -1,6 +1,7 @@
 import logging
 from collections.abc import AsyncIterator, Awaitable, Callable
 from contextlib import asynccontextmanager
+from time import perf_counter
 from typing import Literal, cast
 
 from fastapi import FastAPI, Query, Request, Response, status
@@ -19,6 +20,8 @@ from arogyaflow.exceptions import (
 from arogyaflow.identifiers import new_identifier
 from arogyaflow.logging import bind_request_id, configure_logging, reset_request_id
 from arogyaflow.monitoring import MonitoringReport, load_monitoring_report
+from arogyaflow.observability import ApplicationMetrics
+from arogyaflow.security import RateLimiter, is_protected_path, valid_api_key
 from arogyaflow.serving import (
     ArrivalForecastResponse,
     ForecastRequest,
@@ -50,9 +53,23 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     settings = get_settings()
     configure_logging(settings.log_level)
     app.state.settings = settings
+    metrics = ApplicationMetrics()
+    app.state.metrics = metrics
+    app.state.rate_limiter = RateLimiter(settings.rate_limit_requests_per_minute)
     database = PostgresDatabase(settings) if settings.database_url else None
     if database:
         database.open()
+        metrics.database_ready.set(1)
+    else:
+        metrics.database_ready.set(0)
+    model_paths = {
+        "wait_time": settings.wait_model_path,
+        "arrivals": settings.arrival_model_path,
+        "no_show": settings.no_show_model_path,
+        "occupancy": settings.occupancy_model_path,
+    }
+    for name, path in model_paths.items():
+        metrics.model_available.labels(name).set(int(path is not None and path.is_file()))
     app.state.database = database
     app.state.predictions = PredictionApplication(settings, database)
     try:
@@ -73,17 +90,86 @@ def create_app() -> FastAPI:
     async def request_context(
         request: Request, call_next: Callable[[Request], Awaitable[Response]]
     ) -> Response:
+        started_at = perf_counter()
         request_id = request.headers.get("X-Request-ID") or new_identifier("req")
         request.state.request_id = request_id
         token = bind_request_id(request_id)
+        response: Response | None = None
         try:
-            response = await call_next(request)
-            response.headers["X-Request-ID"] = request_id
+            settings = request.app.state.settings
+            content_length = request.headers.get("Content-Length")
+            try:
+                oversized = content_length is not None and (
+                    int(content_length) < 0 or int(content_length) > settings.max_request_bytes
+                )
+            except ValueError:
+                response = JSONResponse(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    content={
+                        "code": "InvalidContentLength",
+                        "message": "Content-Length must be a non-negative integer",
+                        "request_id": request_id,
+                    },
+                )
+            else:
+                if oversized:
+                    response = JSONResponse(
+                        status_code=status.HTTP_413_CONTENT_TOO_LARGE,
+                        content={
+                            "code": "RequestTooLarge",
+                            "message": "Request body exceeds the configured limit",
+                            "request_id": request_id,
+                        },
+                    )
+            if response is None and is_protected_path(request.url.path):
+                client = request.client.host if request.client else "unknown"
+                limiter = cast(RateLimiter, request.app.state.rate_limiter)
+                if not limiter.allow(client):
+                    response = JSONResponse(
+                        status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+                        headers={"Retry-After": "60"},
+                        content={
+                            "code": "RateLimitExceeded",
+                            "message": "Request rate limit exceeded",
+                            "request_id": request_id,
+                        },
+                    )
+                else:
+                    expected = settings.api_key.get_secret_value() if settings.api_key else None
+                    if not valid_api_key(expected, request.headers.get("X-API-Key")):
+                        response = JSONResponse(
+                            status_code=status.HTTP_401_UNAUTHORIZED,
+                            content={
+                                "code": "AuthenticationRequired",
+                                "message": "A valid API key is required",
+                                "request_id": request_id,
+                            },
+                        )
+            if response is None:
+                response = await call_next(request)
+            response.headers.update(
+                {
+                    "X-Request-ID": request_id,
+                    "X-Content-Type-Options": "nosniff",
+                    "X-Frame-Options": "DENY",
+                    "Referrer-Policy": "no-referrer",
+                    "Cache-Control": "no-store",
+                }
+            )
             return response
         except Exception:
             logger.exception("request_failed")
             raise
         finally:
+            route = request.scope.get("route")
+            route_name = getattr(route, "path", "blocked")
+            metrics = cast(ApplicationMetrics, request.app.state.metrics)
+            metrics.observe_request(
+                request.method,
+                route_name,
+                response.status_code if response else status.HTTP_500_INTERNAL_SERVER_ERROR,
+                perf_counter() - started_at,
+            )
             reset_request_id(token)
 
     @application.exception_handler(ArogyaFlowError)
@@ -109,9 +195,23 @@ def create_app() -> FastAPI:
     @application.get("/health/ready", response_model=HealthStatus)
     def ready(request: Request) -> HealthStatus:
         database = cast(PostgresDatabase | None, request.app.state.database)
+        metrics = cast(ApplicationMetrics, request.app.state.metrics)
         if database:
-            database.ping()
+            try:
+                database.ping()
+            except PersistenceError:
+                metrics.database_ready.set(0)
+                raise
+            metrics.database_ready.set(1)
         return HealthStatus(status="ready")
+
+    @application.get("/metrics", include_in_schema=False)
+    async def metrics(request: Request) -> Response:
+        application_metrics = cast(ApplicationMetrics, request.app.state.metrics)
+        return Response(
+            content=application_metrics.render(),
+            headers={"Content-Type": application_metrics.content_type},
+        )
 
     @application.get("/v1/meta", response_model=ServiceMetadata)
     async def metadata(request: Request) -> ServiceMetadata:

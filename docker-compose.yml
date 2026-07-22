@@ -4,6 +4,7 @@ services:
     environment:
       AROGYAFLOW_ENVIRONMENT: production
       AROGYAFLOW_DATABASE_URL: postgresql://${POSTGRES_USER:?set POSTGRES_USER}:${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB:?set POSTGRES_DB}
+      AROGYAFLOW_API_KEY: ${AROGYAFLOW_API_KEY:?set AROGYAFLOW_API_KEY}
       AROGYAFLOW_WAIT_MODEL_PATH: ${AROGYAFLOW_WAIT_MODEL_PATH:-models/wait_time/wait_time.joblib}
       AROGYAFLOW_ARRIVAL_MODEL_PATH: ${AROGYAFLOW_ARRIVAL_MODEL_PATH:-models/arrivals/arrival_forecast.joblib}
       AROGYAFLOW_NO_SHOW_MODEL_PATH: ${AROGYAFLOW_NO_SHOW_MODEL_PATH:-models/no_show/no_show.joblib}
@@ -11,6 +12,11 @@ services:
       AROGYAFLOW_MONITORING_REPORT_PATH: ${AROGYAFLOW_MONITORING_REPORT_PATH:-reports/monitoring/latest.json}
     ports:
       - "8000:8000"
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health/ready')"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
     depends_on:
       db:
         condition: service_healthy
@@ -37,11 +43,12 @@ services:
     command: streamlit run src/arogyaflow/dashboard.py --server.address 0.0.0.0
     environment:
       AROGYAFLOW_API_BASE_URL: http://api:8000
+      AROGYAFLOW_API_KEY: ${AROGYAFLOW_API_KEY:?set AROGYAFLOW_API_KEY}
     ports:
       - "8501:8501"
     depends_on:
       api:
-        condition: service_started
+        condition: service_healthy
 
   mlflow:
     image: ghcr.io/mlflow/mlflow:v3.14.0

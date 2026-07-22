@@ -6,16 +6,17 @@ from arogyaflow.exceptions import DashboardApiError
 
 
 class DashboardClient:
-    def __init__(self, base_url: str, timeout_seconds: float) -> None:
+    def __init__(self, base_url: str, timeout_seconds: float, api_key: str | None = None) -> None:
         self._base_url = base_url.rstrip("/")
         self._timeout = timeout_seconds
+        self._headers = {"X-API-Key": api_key} if api_key else {}
 
     def _request(
         self, method: str, path: str, payload: dict[str, Any] | None = None
     ) -> dict[str, Any]:
         try:
             with httpx.Client(base_url=self._base_url, timeout=self._timeout) as client:
-                response = client.request(method, path, json=payload)
+                response = client.request(method, path, json=payload, headers=self._headers)
         except httpx.HTTPError as exc:
             raise DashboardApiError("ArogyaFlow API is unavailable") from exc
         if not response.is_success:

@@ -1,4 +1,4 @@
-.PHONY: install format lint type-check test api dashboard migrate generate-data baseline-analysis train-wait-time train-arrivals train-no-show train-occupancy simulate monitor
+.PHONY: install format lint type-check test audit api dashboard migrate generate-data baseline-analysis train-wait-time train-arrivals train-no-show train-occupancy simulate monitor
 
 install:
 	uv sync --all-groups
@@ -14,6 +14,9 @@ type-check:
 
 test:
 	uv run pytest
+
+audit:
+	uv audit --locked
 
 api:
 	uv run uvicorn arogyaflow.api:app --reload

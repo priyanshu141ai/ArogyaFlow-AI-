@@ -26,3 +26,9 @@ def test_settings_reject_invalid_pool_size(monkeypatch: pytest.MonkeyPatch, tmp_
     monkeypatch.chdir(tmp_path)
     with pytest.raises(ValidationError):
         Settings(database_pool_min_size=3, database_pool_max_size=2)
+
+
+def test_production_requires_api_key(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    monkeypatch.chdir(tmp_path)
+    with pytest.raises(ValidationError):
+        Settings(environment="production")

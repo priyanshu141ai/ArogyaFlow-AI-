@@ -306,7 +306,8 @@ def main() -> None:
     )
     _styles()
     settings = get_settings()
-    client = DashboardClient(str(settings.api_base_url), settings.api_timeout_seconds)
+    api_key = settings.api_key.get_secret_value() if settings.api_key else None
+    client = DashboardClient(str(settings.api_base_url), settings.api_timeout_seconds, api_key)
     with st.sidebar:
         st.title("ArogyaFlow AI")
         st.caption("Operational decision-support")
