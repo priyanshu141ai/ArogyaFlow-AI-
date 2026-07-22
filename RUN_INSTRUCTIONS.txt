@@ -1,0 +1,27 @@
+AROGYAFLOW AI - RUN INSTRUCTIONS
+
+Prerequisites
+- Docker Desktop running
+- uv installed
+
+Full demo stack
+1. Open PowerShell in the project folder.
+2. Run: uv sync --all-groups
+3. Run: uv run --group ml demo-stack
+
+The first run generates local secrets, synthetic data, four model artifacts, and a monitoring report before starting the containers.
+
+Open
+- Dashboard: http://localhost:18501
+- API: http://localhost:8000
+- API health: http://localhost:8000/health/ready
+- MLflow: http://localhost:5000
+
+Stop
+1. Press Ctrl+C in the running terminal.
+2. Run: docker compose --env-file .arogyaflow-demo.env down
+
+Notes
+- Generated secrets stay in .arogyaflow-demo.env and are ignored by Git.
+- PostgreSQL and MLflow data are preserved in Docker volumes.
+- If startup fails, confirm ports 5432, 5000, 8000, and 18501 are free.

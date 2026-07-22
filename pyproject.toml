@@ -28,6 +28,7 @@ dependencies = [
 [project.scripts]
 baseline-analysis = "arogyaflow.baseline_pipeline:main"
 generate-data = "arogyaflow.data.cli:main"
+ingest-external-data = "arogyaflow.data.ingestion:main"
 train-wait-time = "arogyaflow.train_wait_time:main"
 train-arrivals = "arogyaflow.arrival_forecasting:main"
 train-no-show = "arogyaflow.train_no_show:main"
@@ -35,6 +36,7 @@ train-occupancy = "arogyaflow.bed_occupancy:main"
 simulate-flow = "arogyaflow.simulation:main"
 migrate-db = "arogyaflow.database:main"
 monitor-model = "arogyaflow.monitoring:main"
+retrain-wait-time = "arogyaflow.retraining:main"
 demo-stack = "arogyaflow.demo:main"
 
 [dependency-groups]

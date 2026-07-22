@@ -45,7 +45,7 @@ services:
       AROGYAFLOW_API_BASE_URL: http://api:8000
       AROGYAFLOW_API_KEY: ${AROGYAFLOW_API_KEY:?set AROGYAFLOW_API_KEY}
     ports:
-      - "8501:8501"
+      - "18501:8501"
     depends_on:
       api:
         condition: service_healthy
