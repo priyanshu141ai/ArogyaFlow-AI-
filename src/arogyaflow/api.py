@@ -18,6 +18,7 @@ from arogyaflow.exceptions import (
 )
 from arogyaflow.identifiers import new_identifier
 from arogyaflow.logging import bind_request_id, configure_logging, reset_request_id
+from arogyaflow.monitoring import MonitoringReport, load_monitoring_report
 from arogyaflow.serving import (
     ArrivalForecastResponse,
     ForecastRequest,
@@ -161,6 +162,11 @@ def create_app() -> FastAPI:
         request: Request, limit: int = Query(default=20, ge=1, le=100)
     ) -> RecentPredictionsResponse:
         return _predictions(request).recent_predictions(limit)
+
+    @application.get("/v1/monitoring/report", response_model=MonitoringReport)
+    def monitoring_report(request: Request) -> MonitoringReport:
+        settings = request.app.state.settings
+        return load_monitoring_report(settings.monitoring_report_path)
 
     return application
 

@@ -50,6 +50,10 @@ class DashboardApiError(ArogyaFlowError):
     """Raised when the dashboard cannot obtain a valid API response."""
 
 
+class ExperimentTrackingError(ArogyaFlowError):
+    """Raised when an MLflow run or registry update fails."""
+
+
 class ValidationError(ArogyaFlowError):
     """Raised when domain input is invalid."""
 

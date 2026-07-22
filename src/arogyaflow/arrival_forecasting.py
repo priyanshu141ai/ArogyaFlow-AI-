@@ -1,6 +1,7 @@
 import argparse
 import json
 import math
+import os
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
@@ -19,6 +20,7 @@ from arogyaflow.baseline_pipeline import load_bronze
 from arogyaflow.data.generation import Dataset
 from arogyaflow.exceptions import ForecastHorizonError, ModelArtifactError, TrainingDataError
 from arogyaflow.time import utc_now
+from arogyaflow.tracking import ModelKind, TrackingOptions, flatten_metrics, log_training_run
 
 FORECAST_SCHEMA_VERSION = "1.0"
 SUPPORTED_HORIZONS = (6, 12, 24)
@@ -34,12 +36,14 @@ FEATURE_COLUMNS = (
 )
 
 
-class ArrivalTrainingConfig(BaseModel):
+class ArrivalTrainingConfig(TrackingOptions):
     model_config = ConfigDict(frozen=True)
 
     model_version: str = Field(min_length=1)
     random_seed: int
     backtest_windows: int = Field(default=3, ge=2, le=8)
+    experiment_name: str = "arogyaflow-arrivals"
+    registered_model_name: str = "arogyaflow-arrivals"
 
 
 class ForecastPoint(BaseModel):
@@ -77,6 +81,7 @@ class ArrivalTrainingResult:
     artifact_path: Path
     report_path: Path
     report: dict[str, Any]
+    mlflow_run_id: str | None
 
 
 def build_forecast_features(target: pd.DataFrame) -> pd.DataFrame:
@@ -344,7 +349,22 @@ def train_arrival_forecaster(
     }
     report_path = output_dir / "arrival_evaluation.json"
     report_path.write_text(json.dumps(report, indent=2), encoding="utf-8")
-    return ArrivalTrainingResult(artifact_path, report_path, report)
+    run = log_training_run(
+        config,
+        model_kind=ModelKind.ARRIVALS,
+        output_dir=output_dir,
+        artifact_path=artifact_path,
+        report_path=report_path,
+        parameters={
+            "model_version": config.model_version,
+            "forecast_schema_version": FORECAST_SCHEMA_VERSION,
+            "random_seed": config.random_seed,
+        },
+        metrics=flatten_metrics(report),
+    )
+    report["mlflow"] = run.__dict__ if run else {"tracking_enabled": False}
+    report_path.write_text(json.dumps(report, indent=2), encoding="utf-8")
+    return ArrivalTrainingResult(artifact_path, report_path, report, run.run_id if run else None)
 
 
 def train_arrival_from_dataset(
@@ -367,8 +387,15 @@ def main() -> None:
     parser.add_argument("--output", type=Path, default=Path("models/arrivals"))
     parser.add_argument("--model-version", required=True)
     parser.add_argument("--seed", required=True, type=int)
+    parser.add_argument("--tracking-uri", default=os.environ.get("MLFLOW_TRACKING_URI"))
+    parser.add_argument("--skip-tracking", action="store_true")
     args = parser.parse_args()
-    config = ArrivalTrainingConfig(model_version=args.model_version, random_seed=args.seed)
+    config = ArrivalTrainingConfig(
+        model_version=args.model_version,
+        random_seed=args.seed,
+        mlflow_tracking_uri=args.tracking_uri,
+        track_experiment=not args.skip_tracking,
+    )
     train_arrival_from_dataset(load_bronze(args.bronze), config, args.output)
 
 

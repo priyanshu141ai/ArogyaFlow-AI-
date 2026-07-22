@@ -14,6 +14,7 @@ NAVIGATION = (
     "No-show",
     "Occupancy",
     "Simulation",
+    "Monitoring",
 )
 WEEKDAYS = ("Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday")
 
@@ -276,6 +277,29 @@ def _simulation(client: DashboardClient) -> None:
         st.caption(" · ".join(cast(list[str], result["assumptions"])))
 
 
+def _monitoring(client: DashboardClient) -> None:
+    st.title("Model monitoring")
+    try:
+        report = client.get("/v1/monitoring/report")
+    except DashboardApiError as exc:
+        st.info(str(exc))
+        return
+    status_column, missing_column, duplicate_column = st.columns(3)
+    status_column.metric("Status", str(report["status"]).replace("_", " ").title())
+    missing_column.metric("Missing rate", f"{float(report['missing_rate']):.2%}")
+    duplicate_column.metric("Duplicate rate", f"{float(report['duplicate_rate']):.2%}")
+    drift = pd.Series(cast(dict[str, float], report["drift_scores"]), name="drift score")
+    if not drift.empty:
+        st.subheader("Feature drift")
+        st.bar_chart(drift.sort_values(ascending=False))
+    alerts = pd.DataFrame(cast(list[dict[str, Any]], report["alerts"]))
+    st.subheader("Alerts")
+    if alerts.empty:
+        st.success("No monitoring threshold breaches.")
+    else:
+        st.dataframe(alerts, hide_index=True, width="stretch")
+
+
 def main() -> None:
     st.set_page_config(
         page_title="ArogyaFlow AI", page_icon=":material/local_hospital:", layout="wide"
@@ -296,6 +320,7 @@ def main() -> None:
         "No-show": _no_show,
         "Occupancy": _occupancy,
         "Simulation": _simulation,
+        "Monitoring": _monitoring,
     }
     pages[page](client)
 

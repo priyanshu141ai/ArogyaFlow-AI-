@@ -33,6 +33,7 @@ train-no-show = "arogyaflow.train_no_show:main"
 train-occupancy = "arogyaflow.bed_occupancy:main"
 simulate-flow = "arogyaflow.simulation:main"
 migrate-db = "arogyaflow.database:main"
+monitor-model = "arogyaflow.monitoring:main"
 
 [dependency-groups]
 dev = [

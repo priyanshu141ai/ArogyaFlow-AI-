@@ -23,6 +23,7 @@ class Settings(BaseSettings):
     arrival_model_path: Path | None = None
     no_show_model_path: Path | None = None
     occupancy_model_path: Path | None = None
+    monitoring_report_path: Path | None = None
     wait_model_version: str | None = None
     arrival_model_version: str | None = None
     no_show_model_version: str | None = None

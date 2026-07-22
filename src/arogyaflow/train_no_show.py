@@ -1,12 +1,13 @@
 import argparse
 import json
+import os
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
 import numpy as np
 import pandas as pd
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import ConfigDict, Field
 from sklearn.calibration import CalibratedClassifierCV  # type: ignore[import-untyped]
 from sklearn.ensemble import (  # type: ignore[import-untyped]
     HistGradientBoostingClassifier,
@@ -29,9 +30,10 @@ from arogyaflow.no_show import (
     predict_no_show,
     save_artifact,
 )
+from arogyaflow.tracking import ModelKind, TrackingOptions, flatten_metrics, log_training_run
 
 
-class NoShowTrainingConfig(BaseModel):
+class NoShowTrainingConfig(TrackingOptions):
     model_config = ConfigDict(frozen=True)
 
     model_version: str = Field(min_length=1)
@@ -41,6 +43,8 @@ class NoShowTrainingConfig(BaseModel):
     grace_minutes: int = Field(default=60, ge=0)
     late_minutes: int = Field(default=15, ge=0)
     maximum_ece: float = Field(default=0.25, gt=0, le=1)
+    experiment_name: str = "arogyaflow-no-show"
+    registered_model_name: str = "arogyaflow-no-show"
 
 
 @dataclass(frozen=True)
@@ -48,6 +52,7 @@ class NoShowTrainingResult:
     artifact_path: Path
     report_path: Path
     report: dict[str, Any]
+    mlflow_run_id: str | None
 
 
 def _candidates(seed: int) -> dict[str, Any]:
@@ -181,7 +186,23 @@ def train_no_show_model(
     }
     report_path = output_dir / "no_show_evaluation.json"
     report_path.write_text(json.dumps(report, indent=2), encoding="utf-8")
-    return NoShowTrainingResult(artifact_path, report_path, report)
+    run = log_training_run(
+        config,
+        model_kind=ModelKind.NO_SHOW,
+        output_dir=output_dir,
+        artifact_path=artifact_path,
+        report_path=report_path,
+        parameters={
+            "model_version": config.model_version,
+            "selected_model": selected_name,
+            "feature_schema_version": NO_SHOW_SCHEMA_VERSION,
+            "random_seed": config.random_seed,
+        },
+        metrics=flatten_metrics(report),
+    )
+    report["mlflow"] = run.__dict__ if run else {"tracking_enabled": False}
+    report_path.write_text(json.dumps(report, indent=2), encoding="utf-8")
+    return NoShowTrainingResult(artifact_path, report_path, report, run.run_id if run else None)
 
 
 def main() -> None:
@@ -192,12 +213,16 @@ def main() -> None:
     parser.add_argument("--seed", required=True, type=int)
     parser.add_argument("--capacity-fraction", required=True, type=float)
     parser.add_argument("--reminder-effectiveness", required=True, type=float)
+    parser.add_argument("--tracking-uri", default=os.environ.get("MLFLOW_TRACKING_URI"))
+    parser.add_argument("--skip-tracking", action="store_true")
     args = parser.parse_args()
     config = NoShowTrainingConfig(
         model_version=args.model_version,
         random_seed=args.seed,
         reminder_capacity_fraction=args.capacity_fraction,
         reminder_effectiveness=args.reminder_effectiveness,
+        mlflow_tracking_uri=args.tracking_uri,
+        track_experiment=not args.skip_tracking,
     )
     train_no_show_model(load_bronze(args.bronze), config, args.output)
 

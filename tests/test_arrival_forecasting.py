@@ -37,6 +37,8 @@ def test_arrival_training_backtest_and_reconciliation(tmp_path: Path) -> None:
         ArrivalTrainingConfig(model_version="arrival-test-v1", random_seed=5, backtest_windows=2),
         tmp_path,
     )
+    assert result.mlflow_run_id
+    assert result.report["mlflow"]["registered_model_version"]
     assert set(result.report["rolling_backtest"]) == {"6", "12", "24"}
     artifact = load_arrival_artifact(result.artifact_path)
     forecast = forecast_arrivals(artifact, 24)

@@ -1,14 +1,14 @@
 import argparse
 import json
+import os
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
-import mlflow
 import numpy as np
 import pandas as pd
 import shap  # type: ignore[import-untyped]
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import ConfigDict, Field
 from sklearn.base import clone  # type: ignore[import-untyped]
 from sklearn.dummy import DummyRegressor  # type: ignore[import-untyped]
 from sklearn.ensemble import (  # type: ignore[import-untyped]
@@ -21,6 +21,7 @@ from arogyaflow.baseline_pipeline import load_bronze
 from arogyaflow.baselines import temporal_split
 from arogyaflow.data.generation import Dataset
 from arogyaflow.exceptions import TrainingDataError
+from arogyaflow.tracking import ModelKind, TrackingOptions, flatten_metrics, log_training_run
 from arogyaflow.wait_time import (
     FEATURE_COLUMNS,
     FEATURE_SCHEMA_VERSION,
@@ -34,14 +35,14 @@ from arogyaflow.wait_time import (
 )
 
 
-class WaitTimeTrainingConfig(BaseModel):
+class WaitTimeTrainingConfig(TrackingOptions):
     model_config = ConfigDict(frozen=True)
 
     model_version: str = Field(min_length=1)
     random_seed: int
     shap_sample_size: int = Field(default=100, ge=1, le=1000)
     experiment_name: str = "arogyaflow-wait-time"
-    track_experiment: bool = True
+    registered_model_name: str = "arogyaflow-wait-time"
 
 
 @dataclass(frozen=True)
@@ -174,34 +175,23 @@ def train_wait_time_model(
     report_path = output_dir / "wait_time_evaluation.json"
     report_path.write_text(json.dumps(report, indent=2), encoding="utf-8")
 
-    run_id: str | None = None
-    if config.track_experiment:
-        tracking_path = (output_dir / "mlflow.db").resolve().as_posix()
-        mlflow.set_tracking_uri(f"sqlite:///{tracking_path}")
-        client = mlflow.MlflowClient()
-        experiment = client.get_experiment_by_name(config.experiment_name)
-        experiment_id = (
-            experiment.experiment_id
-            if experiment
-            else client.create_experiment(
-                config.experiment_name,
-                artifact_location=(output_dir / "mlartifacts").resolve().as_uri(),
-            )
-        )
-        with mlflow.start_run(experiment_id=experiment_id, run_name=config.model_version) as run:
-            mlflow.log_params(
-                {
-                    "model_version": config.model_version,
-                    "selected_model": selected_name,
-                    "feature_schema_version": FEATURE_SCHEMA_VERSION,
-                    "random_seed": config.random_seed,
-                }
-            )
-            mlflow.log_metrics({f"test_{key}": value for key, value in point_metrics.items()})
-            mlflow.log_artifact(str(artifact_path))
-            mlflow.log_artifact(str(report_path))
-            run_id = run.info.run_id
-    return TrainingResult(artifact_path, report_path, report, run_id)
+    run = log_training_run(
+        config,
+        model_kind=ModelKind.WAIT_TIME,
+        output_dir=output_dir,
+        artifact_path=artifact_path,
+        report_path=report_path,
+        parameters={
+            "model_version": config.model_version,
+            "selected_model": selected_name,
+            "feature_schema_version": FEATURE_SCHEMA_VERSION,
+            "random_seed": config.random_seed,
+        },
+        metrics=flatten_metrics(report),
+    )
+    report["mlflow"] = run.__dict__ if run else {"tracking_enabled": False}
+    report_path.write_text(json.dumps(report, indent=2), encoding="utf-8")
+    return TrainingResult(artifact_path, report_path, report, run.run_id if run else None)
 
 
 def main() -> None:
@@ -210,8 +200,15 @@ def main() -> None:
     parser.add_argument("--output", type=Path, default=Path("models/wait_time"))
     parser.add_argument("--model-version", required=True)
     parser.add_argument("--seed", required=True, type=int)
+    parser.add_argument("--tracking-uri", default=os.environ.get("MLFLOW_TRACKING_URI"))
+    parser.add_argument("--skip-tracking", action="store_true")
     args = parser.parse_args()
-    config = WaitTimeTrainingConfig(model_version=args.model_version, random_seed=args.seed)
+    config = WaitTimeTrainingConfig(
+        model_version=args.model_version,
+        random_seed=args.seed,
+        mlflow_tracking_uri=args.tracking_uri,
+        track_experiment=not args.skip_tracking,
+    )
     train_wait_time_model(load_bronze(args.bronze), config, args.output)
 
 

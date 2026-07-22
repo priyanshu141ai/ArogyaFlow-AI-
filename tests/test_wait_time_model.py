@@ -37,6 +37,7 @@ def test_wait_time_training_and_inference(tmp_path: Path) -> None:
     )
     assert result.report["beats_baseline"] is True
     assert result.mlflow_run_id
+    assert result.report["mlflow"]["registered_model_version"]
     artifact = load_artifact(result.artifact_path)
     features = build_wait_time_features(dataset).head(3)
     predictions = predict_wait_time(artifact, features)

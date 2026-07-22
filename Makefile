@@ -1,4 +1,4 @@
-.PHONY: install format lint type-check test api dashboard migrate generate-data baseline-analysis train-wait-time train-arrivals train-no-show train-occupancy simulate
+.PHONY: install format lint type-check test api dashboard migrate generate-data baseline-analysis train-wait-time train-arrivals train-no-show train-occupancy simulate monitor
 
 install:
 	uv sync --all-groups
@@ -44,3 +44,6 @@ train-occupancy:
 
 simulate:
 	uv run simulate-flow --seed $(SEED) --duration $(DURATION) --arrivals-per-hour $(ARRIVALS) --doctors $(DOCTORS) --rooms $(ROOMS) --service-minutes $(SERVICE_MINUTES) --max-doctors $(MAX_DOCTORS) --max-rooms $(MAX_ROOMS) --minimum-improvement $(MIN_IMPROVEMENT)
+
+monitor:
+	uv run monitor-model --reference $(REFERENCE) --current $(CURRENT) --reference-metrics $(REFERENCE_METRICS) --current-metrics $(CURRENT_METRICS) --output $(OUTPUT) $(REQUIRED_COLUMNS)

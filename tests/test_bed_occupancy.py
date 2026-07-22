@@ -60,6 +60,8 @@ def test_occupancy_training_forecast_and_alerts(tmp_path: Path) -> None:
         ),
         tmp_path,
     )
+    assert result.mlflow_run_id
+    assert result.report["mlflow"]["registered_model_version"]
     assert result.report["occupancy_invariants_passed"] is True
     assert "alert_recall" in result.report["rolling_backtest"]["24"]["capacity_alerts"]
     artifact = load_occupancy_artifact(result.artifact_path)

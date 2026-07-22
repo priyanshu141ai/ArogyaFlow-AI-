@@ -8,6 +8,7 @@ services:
       AROGYAFLOW_ARRIVAL_MODEL_PATH: ${AROGYAFLOW_ARRIVAL_MODEL_PATH:-models/arrivals/arrival_forecast.joblib}
       AROGYAFLOW_NO_SHOW_MODEL_PATH: ${AROGYAFLOW_NO_SHOW_MODEL_PATH:-models/no_show/no_show.joblib}
       AROGYAFLOW_OCCUPANCY_MODEL_PATH: ${AROGYAFLOW_OCCUPANCY_MODEL_PATH:-models/occupancy/bed_occupancy.joblib}
+      AROGYAFLOW_MONITORING_REPORT_PATH: ${AROGYAFLOW_MONITORING_REPORT_PATH:-reports/monitoring/latest.json}
     ports:
       - "8000:8000"
     depends_on:
@@ -15,6 +16,7 @@ services:
         condition: service_healthy
     volumes:
       - ./models:/app/models:ro
+      - ./reports:/app/reports:ro
 
   db:
     image: postgres:17-alpine
@@ -43,7 +45,7 @@ services:
 
   mlflow:
     image: ghcr.io/mlflow/mlflow:v3.14.0
-    command: mlflow server --host 0.0.0.0 --port 5000 --backend-store-uri sqlite:////mlflow/mlflow.db
+    command: mlflow server --host 0.0.0.0 --port 5000 --backend-store-uri sqlite:////mlflow/mlflow.db --default-artifact-root /mlflow/artifacts
     ports:
       - "5000:5000"
     volumes:

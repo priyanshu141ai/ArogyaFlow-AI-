@@ -1,6 +1,7 @@
 import argparse
 import json
 import math
+import os
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
@@ -24,6 +25,7 @@ from arogyaflow.exceptions import (
     TrainingDataError,
 )
 from arogyaflow.time import utc_now
+from arogyaflow.tracking import ModelKind, TrackingOptions, flatten_metrics, log_training_run
 
 OCCUPANCY_SCHEMA_VERSION = "1.0"
 SUPPORTED_HORIZONS = (6, 12, 24)
@@ -40,13 +42,15 @@ FEATURE_COLUMNS = (
 )
 
 
-class OccupancyTrainingConfig(BaseModel):
+class OccupancyTrainingConfig(TrackingOptions):
     model_config = ConfigDict(frozen=True)
 
     model_version: str = Field(min_length=1)
     random_seed: int
     alert_threshold: float = Field(gt=0, le=1)
     backtest_windows: int = Field(default=3, ge=2, le=8)
+    experiment_name: str = "arogyaflow-occupancy"
+    registered_model_name: str = "arogyaflow-occupancy"
 
 
 class OccupancyPoint(BaseModel):
@@ -86,6 +90,7 @@ class OccupancyTrainingResult:
     artifact_path: Path
     report_path: Path
     report: dict[str, Any]
+    mlflow_run_id: str | None
 
 
 def build_occupancy_target(dataset: Dataset) -> pd.DataFrame:
@@ -408,7 +413,23 @@ def train_occupancy_model(
     }
     report_path = output_dir / "bed_occupancy_evaluation.json"
     report_path.write_text(json.dumps(report, indent=2), encoding="utf-8")
-    return OccupancyTrainingResult(artifact_path, report_path, report)
+    run = log_training_run(
+        config,
+        model_kind=ModelKind.OCCUPANCY,
+        output_dir=output_dir,
+        artifact_path=artifact_path,
+        report_path=report_path,
+        parameters={
+            "model_version": config.model_version,
+            "forecast_schema_version": OCCUPANCY_SCHEMA_VERSION,
+            "random_seed": config.random_seed,
+            "alert_threshold": config.alert_threshold,
+        },
+        metrics=flatten_metrics(report),
+    )
+    report["mlflow"] = run.__dict__ if run else {"tracking_enabled": False}
+    report_path.write_text(json.dumps(report, indent=2), encoding="utf-8")
+    return OccupancyTrainingResult(artifact_path, report_path, report, run.run_id if run else None)
 
 
 def load_occupancy_artifact(path: Path) -> OccupancyArtifact:
@@ -425,11 +446,15 @@ def main() -> None:
     parser.add_argument("--model-version", required=True)
     parser.add_argument("--seed", required=True, type=int)
     parser.add_argument("--alert-threshold", required=True, type=float)
+    parser.add_argument("--tracking-uri", default=os.environ.get("MLFLOW_TRACKING_URI"))
+    parser.add_argument("--skip-tracking", action="store_true")
     args = parser.parse_args()
     config = OccupancyTrainingConfig(
         model_version=args.model_version,
         random_seed=args.seed,
         alert_threshold=args.alert_threshold,
+        mlflow_tracking_uri=args.tracking_uri,
+        track_experiment=not args.skip_tracking,
     )
     dataset = load_bronze(args.bronze)
     train_occupancy_model(build_occupancy_target(dataset), config, args.output)
