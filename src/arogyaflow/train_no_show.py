@@ -20,6 +20,7 @@ from arogyaflow.baseline_pipeline import load_bronze
 from arogyaflow.baselines import temporal_split
 from arogyaflow.data.generation import Dataset
 from arogyaflow.exceptions import TrainingDataError
+from arogyaflow.explainability import shap_summary
 from arogyaflow.no_show import (
     FEATURE_COLUMNS,
     NO_SHOW_SCHEMA_VERSION,
@@ -43,6 +44,7 @@ class NoShowTrainingConfig(TrackingOptions):
     grace_minutes: int = Field(default=60, ge=0)
     late_minutes: int = Field(default=15, ge=0)
     maximum_ece: float = Field(default=0.25, gt=0, le=1)
+    shap_sample_size: int = Field(default=100, ge=1, le=1000)
     experiment_name: str = "arogyaflow-no-show"
     registered_model_name: str = "arogyaflow-no-show"
 
@@ -57,6 +59,12 @@ class NoShowTrainingResult:
 
 def _candidates(seed: int) -> dict[str, Any]:
     return {
+        "logistic_c_0.1": LogisticRegression(
+            C=0.1, max_iter=1000, class_weight="balanced", random_state=seed
+        ),
+        "logistic_c_1": LogisticRegression(
+            C=1.0, max_iter=1000, class_weight="balanced", random_state=seed
+        ),
         "random_forest": RandomForestClassifier(
             n_estimators=100,
             min_samples_leaf=4,
@@ -124,16 +132,8 @@ def train_no_show_model(
     train_x = preprocessor.fit_transform(split.train[list(FEATURE_COLUMNS)])
     validation_x = preprocessor.transform(split.validation[list(FEATURE_COLUMNS)])
     test_x = preprocessor.transform(split.test[list(FEATURE_COLUMNS)])
-    logistic = LogisticRegression(
-        max_iter=1000, class_weight="balanced", random_state=config.random_seed
-    ).fit(train_x, split.train["no_show"])
-    logistic_validation = logistic.predict_proba(validation_x)[:, 1]
-    validation_report: dict[str, dict[str, float]] = {
-        "logistic_baseline": classification_metrics(
-            split.validation["no_show"], logistic_validation, 0.5
-        )
-    }
     candidates = _candidates(config.random_seed)
+    validation_report: dict[str, dict[str, float]] = {}
     for name, classifier in candidates.items():
         classifier.fit(train_x, split.train["no_show"])
         validation_report[name] = classification_metrics(
@@ -167,6 +167,10 @@ def train_no_show_model(
         "model_version": config.model_version,
         "feature_schema_version": NO_SHOW_SCHEMA_VERSION,
         "selected_model": selected_name,
+        "selection_metric": "validation_brier_score",
+        "candidate_ranking": sorted(
+            validation_report, key=lambda name: validation_report[name]["brier_score"]
+        ),
         "split_boundaries": split.boundaries,
         "validation_models": validation_report,
         "test_metrics": test_metrics,
@@ -178,6 +182,12 @@ def train_no_show_model(
             inference["no_show_probability"].to_numpy(),
             config.reminder_capacity_fraction,
             config.reminder_effectiveness,
+        ),
+        "shap_summary": shap_summary(
+            candidates[selected_name],
+            np.asarray(test_x),
+            preprocessor.get_feature_names_out(),
+            config.shap_sample_size,
         ),
         "limitations": [
             "Threshold prioritizes reminders only and never cancels appointments.",

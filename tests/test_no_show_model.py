@@ -97,6 +97,8 @@ def test_no_show_training_calibration_and_policy(tmp_path: Path) -> None:
     assert result.mlflow_run_id
     assert result.report["mlflow"]["registered_model_version"]
     assert result.report["calibration_acceptable"] is True
+    assert result.report["shap_summary"]
+    assert len(result.report["validation_models"]) >= 4
     assert result.report["policy_simulation"]["automatic_cancellation"] is False
     artifact = load_artifact(result.artifact_path)
     predictions = predict_no_show(artifact, features.head(4))

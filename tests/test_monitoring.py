@@ -30,6 +30,8 @@ def test_monitoring_detects_quality_drift_and_degradation() -> None:
     assert report.drift_scores["department"] == 1
     assert report.metric_degradation["mae"] == 0.5
     assert {alert.component for alert in report.alerts} >= {"drift", "performance"}
+    assert report.retraining_blocked is False
+    assert report.retraining_recommended is True
 
 
 def test_monitoring_report_api(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:

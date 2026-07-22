@@ -7,7 +7,6 @@ from typing import Any
 
 import numpy as np
 import pandas as pd
-import shap  # type: ignore[import-untyped]
 from pydantic import ConfigDict, Field
 from sklearn.base import clone  # type: ignore[import-untyped]
 from sklearn.dummy import DummyRegressor  # type: ignore[import-untyped]
@@ -21,6 +20,7 @@ from arogyaflow.baseline_pipeline import load_bronze
 from arogyaflow.baselines import temporal_split
 from arogyaflow.data.generation import Dataset
 from arogyaflow.exceptions import TrainingDataError
+from arogyaflow.explainability import shap_summary
 from arogyaflow.tracking import ModelKind, TrackingOptions, flatten_metrics, log_training_run
 from arogyaflow.wait_time import (
     FEATURE_COLUMNS,
@@ -41,6 +41,7 @@ class WaitTimeTrainingConfig(TrackingOptions):
     model_version: str = Field(min_length=1)
     random_seed: int
     shap_sample_size: int = Field(default=100, ge=1, le=1000)
+    tuning_budget: int = Field(default=7, ge=3, le=7)
     experiment_name: str = "arogyaflow-wait-time"
     registered_model_name: str = "arogyaflow-wait-time"
 
@@ -53,21 +54,25 @@ class TrainingResult:
     mlflow_run_id: str | None
 
 
-def _candidate_models(seed: int) -> dict[str, Any]:
-    return {
-        "ridge": Ridge(alpha=1.0),
-        "random_forest": RandomForestRegressor(
-            n_estimators=100,
-            min_samples_leaf=3,
-            random_state=seed,
-            n_jobs=1,
+def _candidate_models(seed: int, budget: int) -> dict[str, Any]:
+    candidates = {
+        "ridge_alpha_0.1": Ridge(alpha=0.1),
+        "ridge_alpha_1": Ridge(alpha=1.0),
+        "ridge_alpha_10": Ridge(alpha=10.0),
+        "random_forest_leaf_2": RandomForestRegressor(
+            n_estimators=100, min_samples_leaf=2, random_state=seed, n_jobs=1
         ),
-        "hist_gradient_boosting": HistGradientBoostingRegressor(
-            max_iter=100,
-            max_leaf_nodes=15,
-            random_state=seed,
+        "random_forest_leaf_5": RandomForestRegressor(
+            n_estimators=100, min_samples_leaf=5, random_state=seed, n_jobs=1
+        ),
+        "hist_gradient_boosting_leaf_15": HistGradientBoostingRegressor(
+            max_iter=100, max_leaf_nodes=15, random_state=seed
+        ),
+        "hist_gradient_boosting_leaf_31": HistGradientBoostingRegressor(
+            max_iter=100, max_leaf_nodes=31, l2_regularization=0.1, random_state=seed
         ),
     }
+    return dict(list(candidates.items())[:budget])
 
 
 def _shap_summary(
@@ -75,22 +80,12 @@ def _shap_summary(
 ) -> list[dict[str, object]]:
     sample = features[list(FEATURE_COLUMNS)].head(sample_size)
     transformed = artifact.preprocessor.transform(sample)
-    if isinstance(artifact.point_model, Ridge):
-        values = np.asarray(
-            shap.LinearExplainer(artifact.point_model, transformed)(transformed).values
-        )
-    else:
-        values = np.asarray(
-            shap.TreeExplainer(artifact.point_model).shap_values(
-                transformed, check_additivity=False
-            )
-        )
-    importance = np.abs(values).mean(axis=0)
-    names = artifact.preprocessor.get_feature_names_out()
-    ranking = sorted(zip(names, importance, strict=True), key=lambda item: item[1], reverse=True)
-    return [
-        {"feature": str(name), "mean_absolute_shap": float(value)} for name, value in ranking[:20]
-    ]
+    return shap_summary(
+        artifact.point_model,
+        np.asarray(transformed),
+        artifact.preprocessor.get_feature_names_out(),
+        sample_size,
+    )
 
 
 def train_wait_time_model(
@@ -102,7 +97,7 @@ def train_wait_time_model(
     train_x = preprocessor.fit_transform(split.train[list(FEATURE_COLUMNS)])
     validation_x = preprocessor.transform(split.validation[list(FEATURE_COLUMNS)])
     candidate_metrics: dict[str, dict[str, float]] = {}
-    candidates = _candidate_models(config.random_seed)
+    candidates = _candidate_models(config.random_seed, config.tuning_budget)
     for name, model in candidates.items():
         model.fit(train_x, split.train["wait_minutes"])
         candidate_metrics[name] = regression_metrics(
@@ -159,6 +154,10 @@ def train_wait_time_model(
         "model_version": config.model_version,
         "feature_schema_version": FEATURE_SCHEMA_VERSION,
         "selected_model": selected_name,
+        "selection_metric": "validation_mae",
+        "candidate_ranking": sorted(
+            candidate_metrics, key=lambda name: candidate_metrics[name]["mae"]
+        ),
         "split_boundaries": split.boundaries,
         "validation_candidates": candidate_metrics,
         "test_metrics": point_metrics,
@@ -186,6 +185,7 @@ def train_wait_time_model(
             "selected_model": selected_name,
             "feature_schema_version": FEATURE_SCHEMA_VERSION,
             "random_seed": config.random_seed,
+            "tuning_budget": config.tuning_budget,
         },
         metrics=flatten_metrics(report),
     )

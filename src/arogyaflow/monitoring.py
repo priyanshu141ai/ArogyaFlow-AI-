@@ -35,7 +35,7 @@ class MonitoringReport(BaseModel):
 
     generated_at: datetime
     status: Literal["healthy", "review_required"]
-    synthetic_data_only: Literal[True] = True
+    synthetic_data_only: bool = True
     reference_rows: int
     current_rows: int
     missing_rate: float
@@ -43,6 +43,8 @@ class MonitoringReport(BaseModel):
     drift_scores: dict[str, float]
     metric_degradation: dict[str, float]
     alerts: list[MonitoringAlert]
+    retraining_recommended: bool = False
+    retraining_blocked: bool = False
 
 
 def _numeric_drift(reference: pd.Series, current: pd.Series, bins: int) -> float:
@@ -118,6 +120,8 @@ def build_monitoring_report(
     current_metrics: dict[str, float],
     required_columns: tuple[str, ...],
     thresholds: MonitoringThresholds,
+    *,
+    synthetic_data_only: bool = True,
 ) -> MonitoringReport:
     if reference.empty or current.empty:
         raise DataQualityError("Monitoring datasets cannot be empty")
@@ -175,9 +179,12 @@ def build_monitoring_report(
                     message=message,
                 )
             )
+    quality_alert = any(alert.component == "data_quality" for alert in alerts)
+    model_alert = any(alert.component in {"drift", "performance"} for alert in alerts)
     return MonitoringReport(
         generated_at=utc_now(),
         status="review_required" if alerts else "healthy",
+        synthetic_data_only=synthetic_data_only,
         reference_rows=len(reference),
         current_rows=len(current),
         missing_rate=missing_rate,
@@ -185,6 +192,8 @@ def build_monitoring_report(
         drift_scores=drift,
         metric_degradation=degradation,
         alerts=alerts,
+        retraining_recommended=model_alert and not quality_alert,
+        retraining_blocked=quality_alert,
     )
 
 
@@ -232,6 +241,7 @@ def main() -> None:
     parser.add_argument("--max-duplicate-rate", type=float, default=0.01)
     parser.add_argument("--max-drift-score", type=float, default=0.2)
     parser.add_argument("--max-metric-degradation", type=float, default=0.1)
+    parser.add_argument("--real-data", action="store_true")
     args = parser.parse_args()
     report = build_monitoring_report(
         pd.read_parquet(args.reference),
@@ -245,6 +255,7 @@ def main() -> None:
             max_drift_score=args.max_drift_score,
             max_relative_metric_degradation=args.max_metric_degradation,
         ),
+        synthetic_data_only=not args.real_data,
     )
     args.output.parent.mkdir(parents=True, exist_ok=True)
     args.output.write_text(report.model_dump_json(indent=2), encoding="utf-8")
