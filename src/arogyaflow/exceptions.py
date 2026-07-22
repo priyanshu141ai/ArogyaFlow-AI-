@@ -54,6 +54,10 @@ class ExperimentTrackingError(ArogyaFlowError):
     """Raised when an MLflow run or registry update fails."""
 
 
+class DemoSetupError(ArogyaFlowError):
+    """Raised when the local demo stack cannot be prepared or started."""
+
+
 class ValidationError(ArogyaFlowError):
     """Raised when domain input is invalid."""
 

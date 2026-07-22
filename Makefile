@@ -1,4 +1,4 @@
-.PHONY: install format lint type-check test audit api dashboard migrate generate-data baseline-analysis train-wait-time train-arrivals train-no-show train-occupancy simulate monitor
+.PHONY: install format lint type-check test audit api dashboard demo migrate generate-data baseline-analysis train-wait-time train-arrivals train-no-show train-occupancy simulate monitor
 
 install:
 	uv sync --all-groups
@@ -23,6 +23,9 @@ api:
 
 dashboard:
 	uv run streamlit run src/arogyaflow/dashboard.py
+
+demo:
+	uv run --group ml demo-stack
 
 migrate:
 	uv run migrate-db
